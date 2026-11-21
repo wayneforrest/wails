@@ -315,8 +315,28 @@ func FlashWindow(hwnd HWND, enabled bool) {
 	_, _, _ = procFlashWindowEx.Call(uintptr(unsafe.Pointer(&flashInfo)))
 }
 
+type childWindowEnumProc = func(hwnd HWND, lparam LPARAM) LRESULT
+
+var childWindowEnumProcs callbackRegistry[childWindowEnumProc]
+
+// childWindowEnumCallback is created once and forwards to the caller's
+// callback registered under the LPARAM id, for the same reason as
+// monitorEnumCallback: a callback made per call is never freed.
+var childWindowEnumCallback = syscall.NewCallback(func(hwnd HWND, lparam LPARAM) LRESULT {
+	callback, ok := childWindowEnumProcs.get(lparam)
+	if !ok {
+		return 0 // Stop enumeration
+	}
+	return callback(hwnd, 0)
+})
+
+// EnumChildWindows calls callback for each child of hwnd until it returns 0.
+// The callback receives an LPARAM of 0.
 func EnumChildWindows(hwnd HWND, callback func(hwnd HWND, lparam LPARAM) LRESULT) LRESULT {
-	r, _, _ := procEnumChildWindows.Call(hwnd, syscall.NewCallback(callback), 0)
+	id := childWindowEnumProcs.add(callback)
+	defer childWindowEnumProcs.remove(id)
+
+	r, _, _ := procEnumChildWindows.Call(hwnd, childWindowEnumCallback, id)
 	return r
 }
 
