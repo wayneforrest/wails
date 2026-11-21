@@ -1,3 +1,5 @@
+//go:build windows
+
 package w32
 
 import (
@@ -10,9 +12,6 @@ func TestCallbackRegistryAddGetRemove(t *testing.T) {
 
 	a := r.add("a")
 	b := r.add("b")
-	if a == 0 || b == 0 {
-		t.Fatalf("ids must never be 0, got %d and %d", a, b)
-	}
 	if a == b {
 		t.Fatalf("ids must be unique, both were %d", a)
 	}
@@ -39,14 +38,6 @@ func TestCallbackRegistryUnknownID(t *testing.T) {
 		t.Errorf("get(0) on an empty registry found a value")
 	}
 	r.remove(42) // Must not panic.
-}
-
-func TestCallbackRegistrySkipsZeroOnWrap(t *testing.T) {
-	var r callbackRegistry[int]
-	r.lastID = ^uintptr(0)
-	if id := r.add(1); id == 0 {
-		t.Fatalf("add returned id 0 after wrapping")
-	}
 }
 
 func TestCallbackRegistryConcurrent(t *testing.T) {

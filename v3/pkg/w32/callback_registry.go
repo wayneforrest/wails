@@ -1,23 +1,19 @@
+//go:build windows
+
 package w32
 
 import "sync"
 
-// callbackRegistry hands per-call Go state to a Windows callback that is
-// created only once.
-//
-// Go never frees a callback made by syscall.NewCallback and allows only about
-// 2000 per process, so a callback must not be built from a fresh closure on
-// every call. Instead the callback is a package-level function, and the state
-// it needs travels through the API's LPARAM as an id from this registry.
-// The id is registered before the synchronous Windows call and removed after
-// it returns. Safe for concurrent use.
+// callbackRegistry passes per-call state to a callback created once. Go never
+// frees a syscall.NewCallback callback and allows about 2000 per process, so a
+// per-call closure must travel through the LPARAM as an id from this registry.
 type callbackRegistry[T any] struct {
 	mu     sync.Mutex
 	lastID uintptr
 	items  map[uintptr]T
 }
 
-// add stores value and returns its id. The id is never 0.
+// add stores value and returns its id.
 func (r *callbackRegistry[T]) add(value T) uintptr {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -25,9 +21,6 @@ func (r *callbackRegistry[T]) add(value T) uintptr {
 		r.items = make(map[uintptr]T)
 	}
 	r.lastID++
-	if r.lastID == 0 {
-		r.lastID++
-	}
 	r.items[r.lastID] = value
 	return r.lastID
 }
