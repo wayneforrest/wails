@@ -83,20 +83,15 @@ var cursorPosForScreens = func() (cursor POINT, ok bool) {
 	return cursor, ret != 0
 }
 
-type monitorEnumProc = func(hMonitor uintptr, hdc uintptr, lprcMonitor *RECT, lParam uintptr) uintptr
+var monitorEnumRegistry callbackRegistry[func(hMonitor uintptr, hdc uintptr, lprcMonitor *RECT, lParam uintptr) uintptr]
 
-var monitorEnumProcs callbackRegistry[monitorEnumProc]
-
-// monitorEnumCallback is created once and forwards to the per-call
-// monitorEnumProc registered under the LPARAM id. A callback made per call
-// with syscall.NewCallback is never freed, and Go allows only about 2000 per
-// process, so building one on every GetAllScreens call crashed the app after
-// enough display changes.
+// monitorEnumCallback is created once and forwards to the GetAllScreens call registered under lParam.
 var monitorEnumCallback = syscall.NewCallback(func(hMonitor uintptr, hdc uintptr, lprcMonitor *RECT, lParam uintptr) uintptr {
-	enumFunc, ok := monitorEnumProcs.get(lParam)
+	enumFunc, ok := monitorEnumRegistry.get(lParam)
 	if !ok {
 		return 0 // Stop enumeration
 	}
+	// lParam carries the registry id, so pass on the 0 the call always used.
 	return enumFunc(hMonitor, hdc, lprcMonitor, 0)
 })
 
@@ -159,8 +154,8 @@ func GetAllScreens() ([]*Screen, error) {
 		return 1 // Continue enumeration
 	}
 
-	id := monitorEnumProcs.add(enumFunc)
-	defer monitorEnumProcs.remove(id)
+	id := monitorEnumRegistry.add(enumFunc)
+	defer monitorEnumRegistry.remove(id)
 
 	ret, _, _ := procEnumDisplayMonitors.Call(0, 0, monitorEnumCallback, id)
 	if ret == 0 {

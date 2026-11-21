@@ -7,13 +7,9 @@ import (
 	"testing"
 )
 
-// enumCallbackStressIterations is well past Go's per-process limit on Windows
-// callbacks (about 2000, see cb_max in runtime/syscall_windows.go). Callback
-// slots are never freed, and every distinct closure handed to
-// syscall.NewCallback takes a new one, so an enumeration that builds its
-// callback per call dies with a runtime fatal error ("too many callback
-// functions") long before this many calls. The fatal error cannot be
-// recovered, so a regression kills the test binary.
+// enumCallbackStressIterations is well past Go's limit of about 2000 Windows
+// callbacks per process. A per-call callback exhausts it and the runtime's
+// unrecoverable fatal error kills the test binary.
 const enumCallbackStressIterations = 3000
 
 // TestGetAllScreensDoesNotExhaustCallbacks is the regression test for the
